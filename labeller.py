@@ -4,10 +4,11 @@ import os
 import random
  
 # initialize the list of reference points and boolean indicating
-selecting = False
+selecting, quit = False, False
 b_boxes, neg_boxes, img_list = [], [], []
 x_coor, y_coor, img_index = 0, 0, 1
 dirname = os.path.realpath('.') 
+photo_path = os.path.join(dirname, 'photos/renamed')
 
 #check if boxes are intersecting
 def intersection(b1, b2):
@@ -18,21 +19,22 @@ def intersection(b1, b2):
 	return x2 > x1 and y2 > y1
 
 #generates array of negative boxes
-def generateNegatives(bb, height, width):
+def generateNegatives(bb, height, width, multiples=1):
 	negs = []
 	for i in range(1, len(bb), 2):
 		w, h = bb[i][0] - bb[i-1][0], bb[i][1] - bb[i-1][1]
-		for n in range(10):
-			neg_x, neg_y = random.randint(0, width - w), random.randint(0, height - h)
-			neg_box = [(neg_x, neg_y), (neg_x + w, neg_y + h)]
-			good_box = True
-			for j in range(1, len(bb), 2):
-				if intersection(neg_box, [bb[j-1],bb[j]]):
-					good_box = False
-			if good_box:
-				negs.append(neg_box[0])
-				negs.append(neg_box[1])
-				break
+		for m in range(multiples):
+			for n in range(10):
+				neg_x, neg_y = random.randint(0, width - w), random.randint(0, height - h)
+				neg_box = [(neg_x, neg_y), (neg_x + w, neg_y + h)]
+				good_box = True
+				for j in range(1, len(bb), 2):
+					if intersection(neg_box, [bb[j-1],bb[j]]):
+						good_box = False
+				if good_box:
+					negs.append(neg_box[0])
+					negs.append(neg_box[1])
+					break
 	return negs
 
 def draw_boxes(img, boxes, color):
@@ -60,63 +62,90 @@ def click_and_crop(event, x, y, flags, param):
 
 # construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
-ap.add_argument("-i", "--image", required=True, help="Path to the image")
+#ap.add_argument("-i", "--image", required=True, help="Path to the image")
+ap.add_argument("-m", "--multiples", help="multiples for generating negatives", default=1)
 args = vars(ap.parse_args())
- 
-# load the image, clone it, and setup the mouse callback function
-img_name = args['image']
-img_index = int(img_name[len(img_name) - 5])
+neg_multiples = int(args['multiples'])
 
-img_list.append(img_name[:len(img_name) - 5] + '0.png')
-img_list.append(img_name[:len(img_name) - 5] + '1.png')
-img_list.append(img_name[:len(img_name) - 5] + '2.png')
-
-image = cv2.imread(img_name)
-height, width, _ = image.shape
-
-cv2.namedWindow('image', cv2.WINDOW_NORMAL)
-cv2.setMouseCallback('image', click_and_crop)
-
-while True:
-
-	# display the image and wait for a keypress
-	key = cv2.waitKey(1) & 0xFF
-	clone = image.copy()
-
-	#display bounding box being selected
-	if selecting:
-		cv2.rectangle(clone, b_boxes[len(b_boxes) - 1], (x_coor, y_coor), (0, 255, 0), 8)
-
-	draw_boxes(clone, b_boxes, (0, 255, 0))
-	draw_boxes(clone, neg_boxes, (0, 0, 255))
-	cv2.imshow('image', clone)
-	
-	# 'q' to quit, 'u' to undo, 'e' to export 
-	# 'n' to genetate negatives
-	# 'p' go to next image
-	if key == ord('q'):
+photo_ls = os.listdir(photo_path)
+for photo in photo_ls:
+	if quit:
 		break
 
-	elif key == ord('u'):
-		if len(b_boxes) > 1:
-			b_boxes.pop()
-			b_boxes.pop()
+	img_name = os.path.join('photos/renamed', photo)
+	filename = photo
+	while len(filename) > 0:
+		if not filename[len(filename) - 1] == '_':
+			filename = filename[:len(filename) - 1]
+		else:
+			filename = filename[:len(filename) - 1] + '.txt'
+			filename = os.path.join(dirname, 'labels/' + filename)
+			break
+	else:
+		print('Error in creating filename')
+		break
 
-	elif key == ord('n'):
-		neg_boxes = generateNegatives(b_boxes, height, width)
+	if not os.path.isfile(filename):
 
-	elif key == ord('p'):
-		img_index = (img_index + 1) % 3
-		image = cv2.imread(img_list[img_index])
+		# load the image, clone it, and setup the mouse callback function
+		#img_name = args['image']
+		img_index = int(img_name[len(img_name) - 5])
 
-	elif key == ord('e'):
-		filename = args['image'][15:len(args['image']) - 6] + '.txt'
-		filename = os.path.join(dirname, 'labels/' + filename)
-		f = open(filename, 'w')
-		for name in img_list:
-			f.write(name + '\n')
-		f.write(str(b_boxes) + '\n')
-		f.write(str(neg_boxes) + '\n')
-		f.close()
- 
+		img_list.append(img_name[:len(img_name) - 5] + '1.png')
+		img_list.append(img_name[:len(img_name) - 5] + '2.png')
+		img_list.append(img_name[:len(img_name) - 5] + '3.png')
+
+		print(img_name)
+
+		image = cv2.imread(img_name)
+		height, width, _ = image.shape
+
+		cv2.namedWindow('image', cv2.WINDOW_NORMAL)
+		cv2.setMouseCallback('image', click_and_crop)
+
+		while True:
+
+			# display the image and wait for a keypress
+			key = cv2.waitKey(1) & 0xFF
+			clone = image.copy()
+
+			#display bounding box being selected
+			if selecting:
+				cv2.rectangle(clone, b_boxes[len(b_boxes) - 1], (x_coor, y_coor), (0, 255, 0), 8)
+
+			draw_boxes(clone, b_boxes, (0, 255, 0))
+			draw_boxes(clone, neg_boxes, (0, 0, 255))
+			cv2.imshow('image', clone)
+			
+			# 'q' to quit, 'u' to undo, 'e' to export 
+			# 'n' to genetate negatives
+			# 'p' go to next image
+			if key == ord('q'):
+				quit = True
+				break
+
+			elif key == ord('u'):
+				if len(b_boxes) > 1:
+					b_boxes.pop()
+					b_boxes.pop()
+
+			elif key == ord('n'):
+				neg_boxes = generateNegatives(b_boxes, height, width, neg_multiples)
+
+			elif key == ord('p'):
+				img_index = (img_index + 1) % 3
+				image = cv2.imread(img_list[img_index])
+
+			elif key == ord('e'):
+				#filename = args['image'][15:len(args['image']) - 6] + '.txt'
+				#filename = os.path.join(dirname, 'labels/' + filename)
+				f = open(filename, 'w')
+				for name in img_list:
+					f.write(name + '\n')
+				f.write(str(b_boxes) + '\n')
+				f.write(str(neg_boxes) + '\n')
+				f.close()
+				b_boxes, neg_boxes, img_list = [], [], []
+				break
+		 
 cv2.destroyAllWindows()
