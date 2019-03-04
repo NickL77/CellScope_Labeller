@@ -82,6 +82,7 @@ for photo in photo_ls:
 			filename = os.path.join(dirname, 'labels/' + filename)
 			break
 	else:
+		print(photo)
 		print('Error in creating filename')
 		break
 
